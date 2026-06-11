@@ -1,0 +1,289 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "5aff2611-3cd1-44d1-9402-4eebd33221da",
+   "metadata": {},
+   "source": [
+    "# 02 - Ejemplo de Similitud Coseno y Recomendación (Matriz 3x3)\n",
+    "\n",
+    "En este notebook, demostraremos el funcionamiento matemático de nuestro sistema de recomendación utilizando un escenario simplificado con 3 usuarios y 3 películas.\n",
+    "\n",
+    "**Usuarios:**\n",
+    "* **Ana:** Amante de la Ciencia Ficción, detesta la Comedia.\n",
+    "* **Beto:** Le gusta la Ciencia Ficción y la Acción.\n",
+    "* **Carlos:** Fanático de la Comedia y la Acción, no le gusta la Ciencia Ficción.\n",
+    "\n",
+    "**Películas (Categorías):**\n",
+    "1. Matrix (Sci-Fi)\n",
+    "2. Son como niños (Comedia)\n",
+    "3. Duro de Matar (Acción)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "id": "ca1eec4a-fd55-446f-b339-6645615e8900",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "--- Matriz de Preferencias Original ---\n"
+     ]
+    },
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>Matrix</th>\n",
+       "      <th>Son como niños</th>\n",
+       "      <th>Duro de Matar</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>Ana (u)</th>\n",
+       "      <td>5</td>\n",
+       "      <td>1</td>\n",
+       "      <td>0</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>Beto (v)</th>\n",
+       "      <td>4</td>\n",
+       "      <td>1</td>\n",
+       "      <td>4</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>Carlos (w)</th>\n",
+       "      <td>1</td>\n",
+       "      <td>5</td>\n",
+       "      <td>4</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "            Matrix  Son como niños  Duro de Matar\n",
+       "Ana (u)          5               1              0\n",
+       "Beto (v)         4               1              4\n",
+       "Carlos (w)       1               5              4"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "import numpy as np\n",
+    "import pandas as pd\n",
+    "import sys\n",
+    "import os\n",
+    "\n",
+    "# Agregamos la carpeta 'src' al path para poder importar tus funciones\n",
+    "sys.path.append(os.path.abspath('../src'))\n",
+    "from model.similarity import cosine_similarity\n",
+    "from model.recommender import recommend\n",
+    "\n",
+    "# 1. Definición de la matriz de 3x3\n",
+    "usuarios = ['Ana (u)', 'Beto (v)', 'Carlos (w)']\n",
+    "peliculas = ['Matrix', 'Son como niños', 'Duro de Matar']\n",
+    "\n",
+    "# Calificaciones del 0 al 5 (0 = no vista)\n",
+    "matriz_ejemplo = np.array([\n",
+    "    [5, 1, 0], # Ana\n",
+    "    [4, 1, 4], # Beto\n",
+    "    [1, 5, 4]  # Carlos\n",
+    "])\n",
+    "\n",
+    "df_preferencias = pd.DataFrame(matriz_ejemplo, index=usuarios, columns=peliculas)\n",
+    "print(\"--- Matriz de Preferencias Original ---\")\n",
+    "display(df_preferencias)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "bcd53b0d-3563-4f38-b73a-f33ac9e04622",
+   "metadata": {},
+   "source": [
+    "## Verificación de Cálculos con NumPy\n",
+    "A continuación, utilizaremos nuestra función `cosine_similarity` (desarrollada exclusivamente con NumPy) para calcular la matriz de similitudes cruzadas. \n",
+    "\n",
+    "*Nota para el informe: Según la intuición de estos datos, Ana y Beto deberían tener la mayor similitud, ya que comparten gustos altos en Sci-Fi y bajos en Comedia.*"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "id": "fdf6532f-95d2-4761-84ac-ebeb82dfba86",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "--- Matriz de Similitud Coseno Calculada ---\n"
+     ]
+    },
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>Ana (u)</th>\n",
+       "      <th>Beto (v)</th>\n",
+       "      <th>Carlos (w)</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>Ana (u)</th>\n",
+       "      <td>1.0000</td>\n",
+       "      <td>0.7169</td>\n",
+       "      <td>0.3026</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>Beto (v)</th>\n",
+       "      <td>0.7169</td>\n",
+       "      <td>1.0000</td>\n",
+       "      <td>0.6715</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>Carlos (w)</th>\n",
+       "      <td>0.3026</td>\n",
+       "      <td>0.6715</td>\n",
+       "      <td>1.0000</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "            Ana (u)  Beto (v)  Carlos (w)\n",
+       "Ana (u)      1.0000    0.7169      0.3026\n",
+       "Beto (v)     0.7169    1.0000      0.6715\n",
+       "Carlos (w)   0.3026    0.6715      1.0000"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "# 2. Calcular la matriz de similitud usando tu función\n",
+    "matriz_similitud = cosine_similarity(df_preferencias)\n",
+    "\n",
+    "df_similitud = pd.DataFrame(\n",
+    "    matriz_similitud, \n",
+    "    index=usuarios, \n",
+    "    columns=usuarios\n",
+    ")\n",
+    "\n",
+    "print(\"--- Matriz de Similitud Coseno Calculada ---\")\n",
+    "display(df_similitud.round(4)) # Redondeamos a 4 decimales para mayor claridad"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "988256d1-f6cd-4dcf-809d-87ea4c6b0110",
+   "metadata": {},
+   "source": [
+    "## Generación de Recomendación Lógica\n",
+    "Ahora probaremos nuestra función `recommend`. Seleccionaremos a **Ana** como nuestro usuario objetivo. \n",
+    "Ana no ha visto \"Duro de Matar\" (su puntaje es 0). El sistema debería buscar a su vecino más similar (Beto) y recomendarle la película en base a las altas calificaciones de él."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 9,
+   "id": "1a322e38-57af-44a5-99f4-0428efd40a70",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "--- Recomendación para Ana ---\n",
+      "Película sugerida y puntaje predictivo:\n",
+      "Duro de Matar    2.867713\n",
+      "dtype: float64\n"
+     ]
+    }
+   ],
+   "source": [
+    "# 3. Generar recomendación para Ana\n",
+    "# Parámetros: usuario='Ana (u)', k=1 (solo consideramos a 1 vecino cercano), n=1 (queremos 1 recomendación)\n",
+    "\n",
+    "recomendacion_ana = recommend('Ana (u)', df_preferencias, matriz_similitud, k=1, n=1)\n",
+    "\n",
+    "print(\"--- Recomendación para Ana ---\")\n",
+    "print(\"Película sugerida y puntaje predictivo:\")\n",
+    "print(recomendacion_ana)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "cf5be62f-b4e3-4975-a589-312f99d39a31",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3 (ipykernel)",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.14.5"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
