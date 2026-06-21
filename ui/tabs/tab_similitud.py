@@ -78,6 +78,7 @@ def _plot_heatmap(similarity_df, sample_size):
 
     fig.colorbar(image, ax=ax, label="Similitud coseno")
     st.pyplot(fig)
+    plt.close(fig)
 
 
 def _show_top_similar_users(similarity_df, selected_user):
@@ -93,6 +94,10 @@ def _show_top_similar_users(similarity_df, selected_user):
 
 
 def _plot_profile_comparison(user_item_matrix, similarity_df, selected_user):
+    """
+    Compara el perfil de ratings del usuario objetivo contra su vecino más cercano.
+    """
+
     scores = similarity_df.loc[selected_user].drop(index=selected_user, errors="ignore")
 
     if scores.empty:
@@ -104,26 +109,39 @@ def _plot_profile_comparison(user_item_matrix, similarity_df, selected_user):
     selected_ratings = user_item_matrix.loc[selected_user]
     neighbor_ratings = user_item_matrix.loc[nearest_user]
 
+    common_items = selected_ratings.notna() & neighbor_ratings.notna()
+
     comparison = pd.DataFrame({
-        f"Usuario {selected_user}": selected_ratings,
-        f"Vecino {nearest_user}": neighbor_ratings
-    }).dropna(how="all")
+        f"Usuario {selected_user}": selected_ratings[common_items],
+        f"Vecino {nearest_user}": neighbor_ratings[common_items],
+    })
 
-    comparison = comparison.fillna(0)
+    if comparison.empty:
+        st.info(
+            f"El usuario {selected_user} y el vecino {nearest_user} no tienen películas valoradas en común."
+        )
+        return
 
-    active_items = comparison.sum(axis=1).sort_values(ascending=False).head(12).index
-    comparison = comparison.loc[active_items]
+    comparison["Diferencia"] = (
+        comparison[f"Usuario {selected_user}"] - comparison[f"Vecino {nearest_user}"]
+    ).abs()
+
+    comparison = comparison.sort_values("Diferencia").head(12)
+    comparison = comparison.drop(columns=["Diferencia"])
 
     fig, ax = plt.subplots(figsize=(9, 5))
     comparison.plot(kind="bar", ax=ax)
 
-    ax.set_title(f"Perfil de ratings: usuario {selected_user} vs vecino {nearest_user}")
+    ax.set_title(
+        f"Películas valoradas por ambos: usuario {selected_user} vs vecino {nearest_user}"
+    )
     ax.set_xlabel("Películas")
     ax.set_ylabel("Rating")
+    ax.set_ylim(0, 5)
     ax.grid(axis="y", alpha=0.3)
     ax.legend()
-
     st.pyplot(fig)
+    plt.close(fig)
 
 
 def render_tab_similitud():

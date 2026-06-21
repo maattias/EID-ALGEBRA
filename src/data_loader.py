@@ -193,6 +193,42 @@ def get_movie_title_map(movies_df=None):
 
     return dict(zip(movies_df["movieId"], movies_df["title"]))
 
+def obtener_lista_usuarios(df):
+    """
+    Retorna la lista ordenada de usuarios disponibles.
+    """
+    return sorted(df["userId"].unique().tolist())
+
+
+def obtener_peliculas_usuario(df, user_id):
+    """
+    Retorna las películas valoradas por un usuario.
+    """
+    return df[df["userId"] == user_id].copy()
+
+
+def obtener_estadisticas(df):
+    """
+    Retorna estadísticas básicas del dataset para el sidebar.
+    """
+    n_usuarios = df["userId"].nunique()
+    n_peliculas = df["movieId"].nunique()
+    n_valoraciones = len(df)
+
+    total_posibles = n_usuarios * n_peliculas
+
+    if total_posibles == 0:
+        densidad = 0
+    else:
+        densidad = round((n_valoraciones / total_posibles) * 100, 2)
+
+    return {
+        "n_usuarios": int(n_usuarios),
+        "n_peliculas": int(n_peliculas),
+        "n_valoraciones": int(n_valoraciones),
+        "densidad": densidad,
+    }
+
 
 if __name__ == "__main__":
     df = load_dataset()

@@ -25,8 +25,7 @@ Este dataset contiene valoraciones de usuarios sobre películas y es adecuado pa
 
 La estructura final debe quedar así:
 
-```txt
-proyecto/
+
 └── data/
     ├── INSTRUCCIONES_DATASET.md
     └── ml-100k/
@@ -34,3 +33,9 @@ proyecto/
         ├── u.item
         ├── u.user
         └── README
+        ## 3. Archivos utilizados
+
+
+- `u.data`: contiene las valoraciones de usuarios sobre películas.
+- `u.item`: contiene los datos de las películas, incluyendo el título.
+- `u.user`: contiene datos básicos de usuarios.
