@@ -1,6 +1,6 @@
 import numpy as np
 
-from model.similarity import cosine_similarity
+from src.model.similarity import cosine_similarity
 
 
 def test_diagonal_is_one():
