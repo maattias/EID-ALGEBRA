@@ -1,13 +1,14 @@
 import streamlit as st
+
 from ui.sidebar import render_sidebar
-from ui.tabs.tab_recomendaciones import render_tab_recomendaciones
+#from ui.tabs.tab_recomendaciones import render_tab_recomendaciones
 from ui.tabs.tab_analisis import render_tab_analisis
 from ui.tabs.tab_similitud import render_tab_similitud
-from ui.tabs.tab_matematicas import render_tab_matematicas
-from src.data_loader import cargar_datos, construir_matriz
-from src.similarity import calcular_matriz_similitud
 
-# ── Configuración general de la página ────────────────────────────────────────
+from src.data_loader import load_dataset, build_user_item_matrix
+from src.model.similarity import calculate_similarity_matrix
+from ui.styles import cargar_estilos
+
 
 st.set_page_config(
     page_title="SistemaRec — Recomendaciones con Álgebra Lineal",
@@ -16,86 +17,71 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ── Inyectar estilos globales ──────────────────────────────────────────────────
-
-from ui.styles import cargar_estilos
 cargar_estilos()
-
-# ── Encabezado principal ───────────────────────────────────────────────────────
 
 st.title("🎬 Sistema de Recomendación")
 st.caption("Basado en similitud coseno y álgebra lineal · MATE1187")
-
 st.divider()
 
-# ── Carga de datos (con caché para no recalcular en cada interacción) ──────────
 
 @st.cache_data(show_spinner=False)
 def inicializar_datos():
-    """
-    Carga el dataset, construye la matriz usuario-producto
-    y calcula la matriz de similitud completa.
-    Retorna un diccionario con todo lo necesario para los tabs.
-    """
-    df = cargar_datos()
-    matriz = construir_matriz(df)
-    similitud = calcular_matriz_similitud(matriz)
+    df = load_dataset()
+
+    matriz = build_user_item_matrix(df, item_col="title")
+    similitud = calculate_similarity_matrix(matriz)
+
     return {
         "df": df,
         "matriz": matriz,
         "similitud": similitud,
     }
 
-# Indicador de carga visible al usuario
+
 with st.spinner("Cargando dataset y calculando similitudes..."):
     try:
         datos = inicializar_datos()
-        st.session_state["datos"] = datos
         carga_exitosa = True
     except FileNotFoundError:
+        datos = None
         carga_exitosa = False
+        st.session_state["error"] = "No se encontró el dataset."
     except Exception as e:
+        datos = None
         carga_exitosa = False
         st.session_state["error"] = str(e)
 
-# Manejo de errores de carga
+
 if not carga_exitosa:
     st.error(
-        "⚠️ No se encontró el dataset. "
-        "Revisa `data/INSTRUCCIONES_DATASET.md` para saber cómo descargarlo y dónde ubicarlo."
+        "⚠️ No se pudo cargar la app. "
+        "Revisa que el dataset esté en `data/ml-100k/` y que existan `u.data`, `u.item` y `u.user`."
     )
+
+    with st.expander("Ver detalle del error"):
+        st.code(st.session_state.get("error", "Error desconocido"))
+
     st.stop()
 
-# ── Sidebar ────────────────────────────────────────────────────────────────────
 
-parametros = render_sidebar(datos=st.session_state["datos"])
+st.session_state["datos"] = datos
+st.session_state["ratings_df"] = datos["df"]
+st.session_state["user_item_matrix"] = datos["matriz"]
+st.session_state["similarity_matrix"] = datos["similitud"]
 
-# ── Tabs principales ───────────────────────────────────────────────────────────
+parametros = render_sidebar(datos=datos)
 
-tab1, tab2, tab3, tab4 = st.tabs([
-    "🎯 Recomendaciones",
+st.session_state["selected_user"] = parametros["user_id"]
+st.session_state["sample_size"] = parametros["n_muestra_heatmap"]
+
+
+tab1, tab2 = st.tabs([
     "📊 Análisis",
     "🔗 Similitud",
-    "📐 Matemáticas",
 ])
 
 with tab1:
-    render_tab_recomendaciones(
-        datos=st.session_state["datos"],
-        parametros=parametros,
-    )
+    render_tab_analisis()
 
 with tab2:
-    render_tab_analisis(
-        datos=st.session_state["datos"],
-        parametros=parametros,
-    )
-
-with tab3:
-    render_tab_similitud(
-        datos=st.session_state["datos"],
-        parametros=parametros,
-    )
-
-with tab4:
-    render_tab_matematicas()
+    render_tab_similitud()

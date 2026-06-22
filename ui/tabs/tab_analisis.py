@@ -23,22 +23,41 @@ def _get_col(df, possible_names):
 
 
 def _recommendations_to_df():
-    for key in ["recommendation_history", "recommendations_history", "all_recommendations"]:
+    """
+    Recupera recomendaciones guardadas en st.session_state.
+    """
+
+    fixed_keys = [
+        "recommendation_history",
+        "recommendations_history",
+        "all_recommendations",
+        "recommendations_df",
+        "recommendations",
+    ]
+
+    frames = []
+
+    for key in fixed_keys:
         value = st.session_state.get(key)
-        if isinstance(value, pd.DataFrame):
-            return value
-        if isinstance(value, list) and value:
-            return pd.DataFrame(value)
 
-    for key in ["recommendations_df", "recommendations"]:
-        value = st.session_state.get(key)
-        if isinstance(value, pd.DataFrame):
-            return value
-        if isinstance(value, list) and value:
-            return pd.DataFrame(value)
+        if isinstance(value, pd.DataFrame) and not value.empty:
+            frames.append(value)
 
-    return None
+        elif isinstance(value, list) and value:
+            frames.append(pd.DataFrame(value))
 
+    for key, value in st.session_state.items():
+        if key.startswith("recs_"):
+            if isinstance(value, pd.DataFrame) and not value.empty:
+                frames.append(value)
+
+            elif isinstance(value, list) and value:
+                frames.append(pd.DataFrame(value))
+
+    if not frames:
+        return None
+
+    return pd.concat(frames, ignore_index=True)
 
 def _plot_rating_distribution(ratings_df, rating_col):
     fig, ax = plt.subplots(figsize=(8, 4))
@@ -48,6 +67,7 @@ def _plot_rating_distribution(ratings_df, rating_col):
     ax.set_ylabel("Cantidad de valoraciones")
     ax.grid(axis="y", alpha=0.3)
     st.pyplot(fig)
+    plt.close(fig)
 
 
 def _plot_top_recommended(recommendations_df):
@@ -55,7 +75,10 @@ def _plot_top_recommended(recommendations_df):
         st.info("Aún no hay recomendaciones generadas. Este gráfico aparecerá cuando `src/recommender.py` guarde resultados en `st.session_state`.")
         return
 
-    title_col = _get_col(recommendations_df, ["title", "movieTitle", "movie_title", "nombre", "pelicula"])
+    title_col = _get_col(
+        recommendations_df,
+        ["pelicula", "Película", "title", "movieTitle", "movie_title", "nombre"]
+    )
     movie_col = _get_col(recommendations_df, ["movieId", "movie_id", "itemId", "item_id"])
 
     if title_col:
@@ -76,6 +99,7 @@ def _plot_top_recommended(recommendations_df):
     ax.set_ylabel("Película")
     ax.grid(axis="x", alpha=0.3)
     st.pyplot(fig)
+    plt.close(fig)
 
 
 def render_tab_analisis():

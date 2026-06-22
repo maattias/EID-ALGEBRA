@@ -9,7 +9,7 @@ Contenido:
 
 import streamlit as st
 import pandas as pd
-from src.recommender import recomendar
+from src.model.recommender import recomendar
 from src.data_loader import obtener_peliculas_usuario
 from ui.components import (
     tarjeta_pelicula,
