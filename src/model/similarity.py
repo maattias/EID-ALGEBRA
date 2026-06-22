@@ -1,83 +1,83 @@
-#src/model/similarity.py
+#src/model/similitud.py
 
 import numpy as np
 import pandas as pd
 
 
-def calculate_dot_product(u, v):
+def calcular_producto_punto(u, v):
     """Calcula el producto punto entre dos vectores."""
-    u_clean = np.nan_to_num(u, nan=0.0)
-    v_clean = np.nan_to_num(v, nan=0.0)
+    u_limpio = np.nan_to_num(u, nan=0.0)
+    v_limpio = np.nan_to_num(v, nan=0.0)
 
-    return float(np.dot(u_clean, v_clean))
+    return float(np.dot(u_limpio, v_limpio))
 
 
-def calculate_norm(v):
+def calcular_norma(v):
     """Calcula la norma euclidiana de un vector."""
-    v_clean = np.nan_to_num(v, nan=0.0)
+    v_limpio = np.nan_to_num(v, nan=0.0)
 
-    return float(np.linalg.norm(v_clean))
+    return float(np.linalg.norm(v_limpio))
 
 
-def calculate_cosine_similarity(u, v):
+def calcular_similitud_coseno(u, v):
     """Calcula la similitud coseno entre dos vectores."""
-    dot_product = calculate_dot_product(u, v)
-    norm_u = calculate_norm(u)
-    norm_v = calculate_norm(v)
+    producto_punto = calcular_producto_punto(u, v)
+    norma_u = calcular_norma(u)
+    norma_v = calcular_norma(v)
 
-    if norm_u == 0 or norm_v == 0:
+    if norma_u == 0 or norma_v == 0:
         return 0.0
 
-    similarity = dot_product / (norm_u * norm_v)
+    similitud = producto_punto / (norma_u * norma_v)
 
-    return float(np.clip(similarity, -1.0, 1.0))
+    return float(np.clip(similitud, -1.0, 1.0))
 
 
-def get_cosine_similarity_steps(u, v):
+def obtener_pasos_similitud_coseno(u, v):
     """Retorna los valores intermedios del calculo de similitud coseno."""
-    dot_product = calculate_dot_product(u, v)
-    norm_u = calculate_norm(u)
-    norm_v = calculate_norm(v)
+    producto_punto = calcular_producto_punto(u, v)
+    norma_u = calcular_norma(u)
+    norma_v = calcular_norma(v)
 
-    if norm_u == 0 or norm_v == 0:
-        similarity = 0.0
+    if norma_u == 0 or norma_v == 0:
+        similitud = 0.0
     else:
-        similarity = dot_product / (norm_u * norm_v)
+        similitud = producto_punto / (norma_u * norma_v)
 
     return {
-        "dot_product": float(dot_product),
-        "norm_u": float(norm_u),
-        "norm_v": float(norm_v),
-        "similarity": float(np.clip(similarity, -1.0, 1.0)),
+        "producto_punto": float(producto_punto),
+        "norma_u": float(norma_u),
+        "norma_v": float(norma_v),
+        "similitud": float(np.clip(similitud, -1.0, 1.0)),
     }
 
 
-def calculate_similarity_matrix(matrix):
+def calcular_matriz_similitud(matriz):
     """Calcula la matriz de similitud coseno entre usuarios."""
-    if not isinstance(matrix, pd.DataFrame):
+    if not isinstance(matriz, pd.DataFrame):
         raise TypeError("La matriz debe ser un DataFrame de pandas.")
 
-    if matrix.empty:
+    if matriz.empty:
         raise ValueError("La matriz usuario-pelicula esta vacia.")
 
-    matrix_filled = matrix.fillna(0)
-    matrix_np = matrix_filled.to_numpy(dtype=float)
+    matriz_rellenada = matriz.fillna(0)
+    matriz_np = matriz_rellenada.to_numpy(dtype=float)
 
-    dot_products = np.dot(matrix_np, matrix_np.T)
-    norms = np.linalg.norm(matrix_np, axis=1)
-    norm_products = np.outer(norms, norms)
+    productos_punto = np.dot(matriz_np, matriz_np.T)
+    normas = np.linalg.norm(matriz_np, axis=1)
+    productos_normas = np.outer(normas, normas)
 
-    similarity_np = np.divide(
-        dot_products,
-        norm_products,
-        out=np.zeros_like(dot_products, dtype=float),
-        where=norm_products != 0,
+    similitud_np = np.divide(
+        productos_punto,
+        productos_normas,
+        out=np.zeros_like(productos_punto, dtype=float),
+        where=productos_normas != 0,
     )
 
-    similarity_np = np.clip(similarity_np, -1.0, 1.0)
+    similitud_np = np.clip(similitud_np, -1.0, 1.0)
 
     return pd.DataFrame(
-        similarity_np,
-        index=matrix.index,
-        columns=matrix.index,
+        similitud_np,
+        index=matriz.index,
+        columns=matriz.index,
     )

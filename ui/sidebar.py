@@ -1,151 +1,103 @@
-"""
-Autor: Matías
+#ui/sidebar.py
 
-Controles disponibles:
-    - Selector de usuario objetivo
-    - Slider: número de recomendaciones (1–20)
-    - Slider: número de vecinos a considerar (5–50)
-    - Slider: tamaño de muestra para el heatmap (10–100)
-    - Sección de información del dataset cargado
-"""
-
-import streamlit as st
 import pandas as pd
-from src.data_loader import obtener_lista_usuarios, obtener_estadisticas, obtener_peliculas_usuario
+import streamlit as st
+
+from src.data_loader import (
+    obtener_estadisticas,
+    obtener_lista_usuarios,
+    obtener_peliculas_usuario,
+)
 
 
 def render_sidebar(datos: dict) -> dict:
-    """
-    Renderiza el sidebar completo con todos los controles de la app.
-
-    Parámetros
-    ----------
-    datos : dict
-        Diccionario con claves 'df', 'matriz' y 'similitud'
-        retornado por inicializar_datos() en app.py.
-
-    Retorna
-    -------
-    dict con los parámetros seleccionados por el usuario:
-        user_id             → int   — usuario objetivo seleccionado
-        n_recomendaciones   → int   — cuántas películas recomendar
-        k_vecinos           → int   — cuántos vecinos similares considerar
-        n_muestra_heatmap   → int   — usuarios para el mapa de calor
-    """
-    df         = datos["df"]
-    matriz     = datos["matriz"]
-    similitud  = datos["similitud"]
+    """Renderiza los controles principales de la aplicacion."""
+    df = datos["df"]
+    matriz = datos["matriz"]
 
     with st.sidebar:
-
-        # ── Logo / título del sidebar ──────────────────────────────────────
-        st.markdown("## 🎬 SistemaRec")
-        st.caption("Filtrado colaborativo · similitud coseno")
+        st.markdown("## SistemaRec")
+        st.caption("Filtrado colaborativo con similitud coseno")
         st.divider()
-
-        # ── Selector de usuario ────────────────────────────────────────────
-        st.markdown("#### 👤 Usuario objetivo")
-
+        st.markdown("#### Usuario objetivo")
         lista_usuarios = obtener_lista_usuarios(df)
 
         user_id = st.selectbox(
             label="Selecciona un usuario",
             options=lista_usuarios,
             index=0,
-            help="El sistema generará recomendaciones personalizadas para este usuario.",
-            label_visibility="collapsed",
         )
-
-        # Mostrar mini-resumen del usuario seleccionado
-        _mostrar_perfil_usuario(df=df, user_id=user_id)
-
+        _mostrar_perfil_usuario(df, user_id)
         st.divider()
-
-        # ── Parámetros de recomendación ────────────────────────────────────
-        st.markdown("#### ⚙️ Parámetros")
+        st.markdown("#### Parametros de recomendacion")
 
         n_recomendaciones = st.slider(
-            label="Nº de recomendaciones",
+            label="Numero de recomendaciones",
             min_value=1,
             max_value=20,
             value=10,
             step=1,
-            help="Cuántas películas mostrar en el resultado final.",
         )
 
         k_vecinos = st.slider(
-            label="Nº de vecinos (K)",
-            min_value=5,
+            label="Numero de vecinos similares",
+            min_value=1,
             max_value=50,
-            value=20,
-            step=5,
-            help=(
-                "Cuántos usuarios similares considerar para generar las recomendaciones. "
-                "Más vecinos = más datos pero puede diluir la similitud."
-            ),
+            value=5,
+            step=1,
         )
 
         st.divider()
 
-        # ── Parámetros de visualización ────────────────────────────────────
-        st.markdown("#### 📊 Visualización")
+        st.markdown("#### Visualizacion")
+
+        max_heatmap = max(1, min(100, len(matriz)))
+        valor_heatmap = min(30, max_heatmap)
 
         n_muestra_heatmap = st.slider(
             label="Usuarios en el heatmap",
-            min_value=10,
-            max_value=min(100, len(matriz)),
-            value=30,
-            step=10,
-            help="Cuántos usuarios incluir en el mapa de calor de similitud.",
+            min_value=1,
+            max_value=max_heatmap,
+            value=valor_heatmap,
+            step=1,
         )
 
         st.divider()
 
-        # ── Info del dataset cargado ───────────────────────────────────────
-        _mostrar_info_dataset(df=df)
+        _mostrar_info_dataset(df)
 
     return {
-        "user_id":           user_id,
+        "user_id": user_id,
         "n_recomendaciones": n_recomendaciones,
-        "k_vecinos":         k_vecinos,
+        "k_vecinos": k_vecinos,
         "n_muestra_heatmap": n_muestra_heatmap,
     }
 
 
-# ── Componentes internos del sidebar ──────────────────────────────────────────
-
 def _mostrar_perfil_usuario(df: pd.DataFrame, user_id: int) -> None:
-    """
-    Muestra un resumen compacto del perfil del usuario seleccionado:
-    cuántas películas ha valorado y su rating promedio.
-    """
-    peliculas_usuario = obtener_peliculas_usuario(df=df, user_id=user_id)
-    n_valoradas  = len(peliculas_usuario)
-    rating_prom  = round(peliculas_usuario["rating"].mean(), 2) if n_valoradas > 0 else 0.0
+    """Muestra un resumen compacto del usuario seleccionado."""
+    peliculas_usuario = obtener_peliculas_usuario(df, user_id)
+
+    n_valoradas = len(peliculas_usuario)
+
+    if n_valoradas == 0:
+        rating_promedio = 0.0
+    else:
+        rating_promedio = round(peliculas_usuario["rating"].mean(), 2)
 
     col1, col2 = st.columns(2)
-    with col1:
-        st.metric(label="Películas valoradas", value=n_valoradas)
-    with col2:
-        st.metric(label="Rating promedio", value=f"⭐ {rating_prom}")
+
+    col1.metric("Peliculas valoradas", n_valoradas)
+    col2.metric("Rating promedio", rating_promedio)
 
 
 def _mostrar_info_dataset(df: pd.DataFrame) -> None:
-    """
-    Muestra estadísticas básicas del dataset en el sidebar.
-    """
+    """Muestra estadisticas generales del dataset."""
     stats = obtener_estadisticas(df)
 
-    st.markdown("#### 🗄️ Dataset")
-    st.markdown(
-        f"""
-        <div style="font-size: 0.8rem; color: #A0AEC0; line-height: 1.8;">
-            👥 <b>{stats['n_usuarios']:,}</b> usuarios<br>
-            🎬 <b>{stats['n_peliculas']:,}</b> películas<br>
-            ⭐ <b>{stats['n_valoraciones']:,}</b> valoraciones<br>
-            📊 Densidad: <b>{stats['densidad']}%</b>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    st.caption("MovieLens 100K · GroupLens Research")
+    st.markdown("#### Dataset")
+    st.write(f"Usuarios: {stats['n_usuarios']:,}")
+    st.write(f"Peliculas: {stats['n_peliculas']:,}")
+    st.write(f"Valoraciones: {stats['n_valoraciones']:,}")
+    st.write(f"Densidad de la matriz: {stats['densidad']}%")
+    st.caption("MovieLens 100K")

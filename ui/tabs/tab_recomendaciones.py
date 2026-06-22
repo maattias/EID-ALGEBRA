@@ -1,149 +1,129 @@
-"""
-
-Contenido:
-    - Encabezado con resumen del usuario seleccionado
-    - Botón para generar recomendaciones
-    - Lista de películas recomendadas con score y ranking
-    - Tabla de películas ya vistas por el usuario (contexto)
-"""
+#ui/tabs/tab_recomendaciones.py
 
 import streamlit as st
-import pandas as pd
-from src.model.recommender import recomendar
 from src.data_loader import obtener_peliculas_usuario
-from ui.components import (
-    tarjeta_pelicula,
-    separador_seccion,
-    metrica_destacada,
-    mensaje_vacio,
-)
+from src.recommender import obtener_k_vecinos, recomendar_con_titulos
 
 
-def render_tab_recomendaciones(datos: dict, parametros: dict) -> None:
-    """
-    Renderiza el tab de recomendaciones personalizadas.
+def render_tab_recomendaciones():
+    """Muestra recomendaciones personalizadas para el usuario seleccionado."""
+    datos = st.session_state["datos"]
 
-    Parámetros
-    ----------
-    datos      : dict — claves 'df', 'matriz', 'similitud'
-    parametros : dict — claves 'user_id', 'n_recomendaciones', 'k_vecinos'
-    """
-    df               = datos["df"]
-    matriz           = datos["matriz"]
-    similitud        = datos["similitud"]
-    user_id          = parametros["user_id"]
-    n_recomendaciones = parametros["n_recomendaciones"]
-    k_vecinos        = parametros["k_vecinos"]
+    df = datos["df"]
+    matriz = datos["matriz"]
+    similitud = datos["similitud"]
 
-    # ── Encabezado ─────────────────────────────────────────────────────────
-    separador_seccion(
-        titulo=f"🎯 Recomendaciones para el Usuario {user_id}",
-        descripcion=(
-            f"Basadas en los {k_vecinos} usuarios más similares · "
-            f"Mostrando top {n_recomendaciones} películas"
-        ),
+    user_id = st.session_state["selected_user"]
+
+    st.header("Recomendaciones personalizadas")
+    st.write(
+        "El sistema busca usuarios similares mediante similitud coseno y recomienda "
+        "peliculas que el usuario objetivo aun no ha valorado."
     )
 
-    # ── Métricas del usuario ────────────────────────────────────────────────
-    peliculas_vistas = obtener_peliculas_usuario(df=df, user_id=user_id)
-    n_vistas    = len(peliculas_vistas)
-    rating_prom = round(peliculas_vistas["rating"].mean(), 2) if n_vistas > 0 else 0.0
+    col1, col2 = st.columns(2)
+
+    with col1:
+        k_vecinos = st.slider(
+            "Cantidad de vecinos similares",
+            min_value=1,
+            max_value=30,
+            value=5,
+            step=1,
+        )
+
+    with col2:
+        n_recomendaciones = st.slider(
+            "Cantidad de recomendaciones",
+            min_value=1,
+            max_value=20,
+            value=10,
+            step=1,
+        )
+
+    peliculas_usuario = obtener_peliculas_usuario(df, user_id)
+
+    total_vistas = len(peliculas_usuario)
+    promedio_usuario = peliculas_usuario["rating"].mean()
 
     col1, col2, col3 = st.columns(3)
-    metrica_destacada(valor=str(user_id),         etiqueta="Usuario objetivo", col=col1)
-    metrica_destacada(valor=f"{n_vistas}",        etiqueta="Películas valoradas", col=col2)
-    metrica_destacada(valor=f"⭐ {rating_prom}",  etiqueta="Rating promedio", col=col3)
+    col1.metric("Usuario objetivo", user_id)
+    col2.metric("Peliculas valoradas", total_vistas)
+    col3.metric("Rating promedio", f"{promedio_usuario:.2f}")
 
     st.divider()
 
-    # ── Generación de recomendaciones ──────────────────────────────────────
-    col_btn, col_info = st.columns([1, 3])
-    with col_btn:
-        generar = st.button("🔍 Generar recomendaciones", use_container_width=True)
+    vecinos = obtener_k_vecinos(
+        user_id=user_id,
+        similitud=similitud,
+        k_vecinos=k_vecinos,
+    )
 
-    # Guardar resultado en session_state para no recalcular al mover sliders
-    clave_cache = f"recs_{user_id}_{n_recomendaciones}_{k_vecinos}"
+    st.subheader("Usuarios mas similares")
 
-    if generar or clave_cache in st.session_state:
+    if vecinos.empty:
+        st.warning("No se encontraron usuarios similares para generar recomendaciones.")
+        return
 
-        if generar or clave_cache not in st.session_state:
-            with st.spinner("Calculando recomendaciones..."):
-                try:
-                    resultado = recomendar(
-                        user_id=user_id,
-                        matriz=matriz,
-                        matriz_similitud=similitud,
-                        n_recomendaciones=n_recomendaciones,
-                        k_vecinos=k_vecinos,
-                    )
-                    st.session_state[clave_cache] = resultado
-                except Exception as e:
-                    st.error(f"Error al generar recomendaciones: {e}")
-                    return
+    vecinos_df = vecinos.reset_index()
+    vecinos_df.columns = ["Usuario similar", "Similitud coseno"]
+    vecinos_df["Similitud coseno"] = vecinos_df["Similitud coseno"].round(4)
 
-        resultado = st.session_state[clave_cache]
+    st.dataframe(
+        vecinos_df,
+        use_container_width=True,
+        hide_index=True,
+    )
 
-        # ── Resultados ──────────────────────────────────────────────────────
-        st.markdown(f"#### 🎬 Top {len(resultado)} películas recomendadas")
+    st.divider()
 
-        if resultado.empty:
-            mensaje_vacio(
-                "No se encontraron recomendaciones para este usuario.",
-                "Prueba aumentando el número de vecinos K en el sidebar.",
-            )
-        else:
-            col_lista, col_detalle = st.columns([3, 2])
+    st.subheader("Peliculas recomendadas")
 
-            with col_lista:
-                for i, fila in resultado.iterrows():
-                    tarjeta_pelicula(
-                        titulo=fila["pelicula"],
-                        score=fila["score_predicho"],
-                        n_vecinos=fila["n_vecinos_que_valoraron"],
-                        posicion=i + 1,
-                    )
+    recomendaciones = recomendar_con_titulos(
+        user_id=user_id,
+        matriz=matriz,
+        similitud=similitud,
+        df=df,
+        k_vecinos=k_vecinos,
+        n_recomendaciones=n_recomendaciones,
+    )
 
-            with col_detalle:
-                st.markdown("##### 📋 Tabla completa")
-                st.dataframe(
-                    resultado.rename(columns={
-                        "pelicula":               "Película",
-                        "score_predicho":         "Score",
-                        "n_vecinos_que_valoraron": "Vecinos",
-                    }),
-                    use_container_width=True,
-                    hide_index=True,
-                    column_config={
-                        "Score": st.column_config.ProgressColumn(
-                            "Score predicho",
-                            format="%.2f",
-                            min_value=0.0,
-                            max_value=5.0,
-                        ),
-                    },
-                )
+    if recomendaciones.empty:
+        st.info(
+            "No se pudieron generar recomendaciones. "
+            "Prueba aumentando la cantidad de vecinos similares."
+        )
+    else:
+        recomendaciones = recomendaciones.rename(
+            columns={
+                "movieId": "ID pelicula",
+                "title": "Pelicula",
+                "puntaje_predicho": "Puntaje predicho",
+            }
+        )
 
-        st.divider()
+        st.dataframe(
+            recomendaciones,
+            use_container_width=True,
+            hide_index=True,
+        )
 
-    # ── Historial del usuario ───────────────────────────────────────────────
-    with st.expander(f"📖 Ver historial de valoraciones del Usuario {user_id}"):
-        if peliculas_vistas.empty:
-            mensaje_vacio("Este usuario no tiene valoraciones registradas.")
-        else:
-            columna_titulo = "title" if "title" in peliculas_vistas.columns else "movieId"
-            st.dataframe(
-                peliculas_vistas.rename(columns={
-                    columna_titulo: "Película",
-                    "rating":       "Rating",
-                }),
-                use_container_width=True,
-                hide_index=True,
-                column_config={
-                    "Rating": st.column_config.ProgressColumn(
-                        "Rating",
-                        format="%.1f ⭐",
-                        min_value=0.0,
-                        max_value=5.0,
-                    ),
-                },
-            )
+    st.divider()
+
+    with st.expander("Ver peliculas ya valoradas por el usuario"):
+        historial = peliculas_usuario[["movieId", "title", "rating"]].copy()
+        historial = historial.sort_values("rating", ascending=False)
+
+        historial = historial.rename(
+            columns={
+                "movieId": "ID pelicula",
+                "title": "Pelicula",
+                "rating": "Rating",
+            }
+        )
+
+        st.dataframe(
+            historial,
+            use_container_width=True,
+            hide_index=True,
+        )

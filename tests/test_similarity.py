@@ -1,52 +1,109 @@
 import numpy as np
+import pandas as pd
 
-from src.model.similarity import cosine_similarity
-
-
-def test_diagonal_is_one():
-    """
-    Cada usuario debe tener similitud 1 consigo mismo.
-    """
-
-    matrix = np.array([
-        [1, 2, 3],
-        [4, 5, 6]
-    ])
-
-    sim = cosine_similarity(matrix)
-
-    assert np.isclose(sim[0, 0], 1.0)
-    assert np.isclose(sim[1, 1], 1.0)
+from src.model.similarity import (
+    calcular_matriz_similitud,
+    calcular_norma,
+    calcular_producto_punto,
+    calcular_similitud_coseno,
+)
 
 
-def test_orthogonal_users():
-    """
-    Usuarios ortogonales deben tener similitud 0.
-    """
+def test_producto_punto():
+    """Verifica el cálculo del producto punto entre dos vectores."""
+    u = np.array([1, 2, 3])
+    v = np.array([4, 5, 6])
 
-    matrix = np.array([
-        [1, 0],
-        [0, 1]
-    ])
+    resultado = calcular_producto_punto(u, v)
 
-    sim = cosine_similarity(matrix)
-
-    assert np.isclose(sim[0, 1], 0.0)
-    assert np.isclose(sim[1, 0], 0.0)
+    assert np.isclose(resultado, 32.0)
 
 
-def test_similarity_range():
-    """
-    Todas las similitudes deben estar entre 0 y 1.
-    """
+def test_norma_vectorial():
+    """Verifica el cálculo de la norma euclidiana."""
+    v = np.array([3, 4])
 
-    matrix = np.array([
-        [1, 2, 3],
-        [3, 4, 5],
-        [1, 0, 1]
-    ])
+    resultado = calcular_norma(v)
 
-    sim = cosine_similarity(matrix)
+    assert np.isclose(resultado, 5.0)
 
-    assert np.all(sim >= 0)
-    assert np.all(sim <= 1)
+
+def test_similitud_coseno_manual():
+    """Compara la similitud coseno contra el cálculo manual."""
+    u = np.array([1, 2, 3])
+    v = np.array([4, 5, 6])
+
+    esperado = 32 / (np.sqrt(14) * np.sqrt(77))
+    resultado = calcular_similitud_coseno(u, v)
+
+    assert np.isclose(resultado, esperado)
+
+
+def test_diagonal_es_uno():
+    """Cada usuario con valoraciones debe tener similitud 1 consigo mismo."""
+    matriz = pd.DataFrame(
+        [
+            [1, 2, 3],
+            [4, 5, 6],
+        ],
+        index=[1, 2],
+        columns=[101, 102, 103],
+    )
+
+    similitud = calcular_matriz_similitud(matriz)
+
+    assert np.isclose(similitud.loc[1, 1], 1.0)
+    assert np.isclose(similitud.loc[2, 2], 1.0)
+
+
+def test_usuarios_ortogonales():
+    """Dos usuarios ortogonales deben tener similitud coseno igual a 0."""
+    matriz = pd.DataFrame(
+        [
+            [1, 0],
+            [0, 1],
+        ],
+        index=[1, 2],
+        columns=[101, 102],
+    )
+
+    similitud = calcular_matriz_similitud(matriz)
+
+    assert np.isclose(similitud.loc[1, 2], 0.0)
+    assert np.isclose(similitud.loc[2, 1], 0.0)
+
+
+def test_rango_similitud_con_ratings_positivos():
+    """Con ratings positivos, las similitudes deben estar entre 0 y 1."""
+    matriz = pd.DataFrame(
+        [
+            [1, 2, 3],
+            [3, 4, 5],
+            [1, 0, 1],
+        ],
+        index=[1, 2, 3],
+        columns=[101, 102, 103],
+    )
+
+    similitud = calcular_matriz_similitud(matriz)
+
+    assert np.all(similitud.values >= 0)
+    assert np.all(similitud.values <= 1)
+
+
+def test_vector_cero_no_rompe_calculo():
+    """Un usuario sin valoraciones no debe generar división por cero."""
+    matriz = pd.DataFrame(
+        [
+            [0, 0, 0],
+            [1, 2, 3],
+        ],
+        index=[1, 2],
+        columns=[101, 102, 103],
+    )
+
+    similitud = calcular_matriz_similitud(matriz)
+
+    assert np.isclose(similitud.loc[1, 1], 0.0)
+    assert np.isclose(similitud.loc[1, 2], 0.0)
+    assert np.isclose(similitud.loc[2, 1], 0.0)

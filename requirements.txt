@@ -1,20 +1,12 @@
 # Instalación:
 #   pip install -r requirements.txt
 
-# Interfaz web
-streamlit>=1.35.0
+streamlit 
 
-# Manipulación de datos
-pandas>=2.0.0
-numpy>=1.26.0
+pandas
 
-# Visualizaciones
-matplotlib>=3.8.0
-seaborn>=0.13.0
-plotly>=5.20.0
+numpy
 
-# Álgebra lineal y ML (solo para comparación, no para la implementación propia)
-scikit-learn>=1.4.0
+matplotlib
 
-# Utilidades
-openpyxl>=3.1.0 
+pytest

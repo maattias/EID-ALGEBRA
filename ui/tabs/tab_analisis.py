@@ -1,144 +1,155 @@
-
 #ui/tabs/tab_analisis.py
 
-import streamlit as st
-import pandas as pd
 import matplotlib.pyplot as plt
-from collections import Counter
+import pandas as pd
+import streamlit as st
+from src.data_loader import obtener_estadisticas
 
 
-def _get_ratings_df():
-    for key in ["ratings_df", "ratings", "dataset", "data"]:
-        value = st.session_state.get(key)
-        if isinstance(value, pd.DataFrame):
-            return value
+def _obtener_dataset():
+    """Obtiene el dataset cargado desde session_state."""
+    df = st.session_state.get("ratings_df")
+
+    if isinstance(df, pd.DataFrame) and not df.empty:
+        return df
+
+    datos = st.session_state.get("datos")
+
+    if isinstance(datos, dict):
+        df = datos.get("df")
+
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            return df
+
     return None
 
 
-def _get_col(df, possible_names):
-    for name in possible_names:
-        if name in df.columns:
-            return name
-    return None
+def _graficar_distribucion_ratings(df):
+    """Grafica la distribucion general de calificaciones."""
+    conteo = df["rating"].value_counts().sort_index()
 
-
-def _recommendations_to_df():
-    """
-    Recupera recomendaciones guardadas en st.session_state.
-    """
-
-    fixed_keys = [
-        "recommendation_history",
-        "recommendations_history",
-        "all_recommendations",
-        "recommendations_df",
-        "recommendations",
-    ]
-
-    frames = []
-
-    for key in fixed_keys:
-        value = st.session_state.get(key)
-
-        if isinstance(value, pd.DataFrame) and not value.empty:
-            frames.append(value)
-
-        elif isinstance(value, list) and value:
-            frames.append(pd.DataFrame(value))
-
-    for key, value in st.session_state.items():
-        if key.startswith("recs_"):
-            if isinstance(value, pd.DataFrame) and not value.empty:
-                frames.append(value)
-
-            elif isinstance(value, list) and value:
-                frames.append(pd.DataFrame(value))
-
-    if not frames:
-        return None
-
-    return pd.concat(frames, ignore_index=True)
-
-def _plot_rating_distribution(ratings_df, rating_col):
     fig, ax = plt.subplots(figsize=(8, 4))
-    ratings_df[rating_col].value_counts().sort_index().plot(kind="bar", ax=ax)
-    ax.set_title("Distribución general de ratings")
+    conteo.plot(kind="bar", ax=ax)
+
+    ax.set_title("Distribucion general de ratings")
     ax.set_xlabel("Rating")
     ax.set_ylabel("Cantidad de valoraciones")
     ax.grid(axis="y", alpha=0.3)
+
     st.pyplot(fig)
     plt.close(fig)
 
 
-def _plot_top_recommended(recommendations_df):
-    if recommendations_df is None or recommendations_df.empty:
-        st.info("Aún no hay recomendaciones generadas. Este gráfico aparecerá cuando `src/recommender.py` guarde resultados en `st.session_state`.")
-        return
-
-    title_col = _get_col(
-        recommendations_df,
-        ["pelicula", "Película", "title", "movieTitle", "movie_title", "nombre"]
+def _graficar_peliculas_mas_valoradas(df):
+    """Grafica las peliculas con mayor cantidad de valoraciones."""
+    top = (
+        df.groupby("title")
+        .size()
+        .sort_values(ascending=False)
+        .head(10)
+        .sort_values()
     )
-    movie_col = _get_col(recommendations_df, ["movieId", "movie_id", "itemId", "item_id"])
-
-    if title_col:
-        labels = recommendations_df[title_col].dropna().astype(str).tolist()
-    elif movie_col:
-        labels = recommendations_df[movie_col].dropna().astype(str).tolist()
-    else:
-        st.warning("No se encontró una columna de película en las recomendaciones.")
-        return
-
-    counter = Counter(labels)
-    top_items = pd.DataFrame(counter.most_common(10), columns=["Película", "Frecuencia"])
 
     fig, ax = plt.subplots(figsize=(8, 5))
-    ax.barh(top_items["Película"][::-1], top_items["Frecuencia"][::-1])
-    ax.set_title("Películas recomendadas con mayor frecuencia")
-    ax.set_xlabel("Frecuencia")
-    ax.set_ylabel("Película")
+    top.plot(kind="barh", ax=ax)
+
+    ax.set_title("Peliculas con mas valoraciones")
+    ax.set_xlabel("Cantidad de valoraciones")
+    ax.set_ylabel("Pelicula")
     ax.grid(axis="x", alpha=0.3)
+
     st.pyplot(fig)
     plt.close(fig)
+
+
+def _mostrar_mejores_promedios(df):
+    """Muestra peliculas con mejor promedio considerando un minimo de valoraciones."""
+    resumen = (
+        df.groupby("title")
+        .agg(
+            promedio_rating=("rating", "mean"),
+            cantidad_valoraciones=("rating", "count"),
+        )
+        .reset_index()
+    )
+
+    resumen = resumen[resumen["cantidad_valoraciones"] >= 50]
+    resumen = resumen.sort_values("promedio_rating", ascending=False).head(10)
+
+    resumen["promedio_rating"] = resumen["promedio_rating"].round(2)
+
+    resumen = resumen.rename(
+        columns={
+            "title": "Pelicula",
+            "promedio_rating": "Rating promedio",
+            "cantidad_valoraciones": "Valoraciones",
+        }
+    )
+
+    st.dataframe(
+        resumen,
+        use_container_width=True,
+        hide_index=True,
+    )
 
 
 def render_tab_analisis():
-    st.header("Análisis experimental del sistema")
+    """Muestra estadisticas exploratorias del dataset."""
+    df = _obtener_dataset()
 
-    ratings_df = _get_ratings_df()
-
-    if ratings_df is None or ratings_df.empty:
-        st.error("No hay dataset cargado en `st.session_state`.")
+    if df is None:
+        st.error("No hay dataset cargado.")
         return
 
-    user_col = _get_col(ratings_df, ["userId", "user_id", "user"])
-    movie_col = _get_col(ratings_df, ["movieId", "movie_id", "itemId", "item_id"])
-    rating_col = _get_col(ratings_df, ["rating", "score", "valoracion"])
+    stats = obtener_estadisticas(df)
 
-    if not user_col or not movie_col or not rating_col:
-        st.error("El dataset debe tener columnas equivalentes a userId, movieId y rating.")
-        return
+    st.header("Analisis del dataset")
 
-    col1, col2, col3 = st.columns(3)
+    st.write(
+        "Esta seccion resume el conjunto de datos MovieLens 100K usado para construir "
+        "la matriz usuario-pelicula."
+    )
 
-    with col1:
-        st.metric("Usuarios", ratings_df[user_col].nunique())
+    col1, col2, col3, col4 = st.columns(4)
 
-    with col2:
-        st.metric("Películas", ratings_df[movie_col].nunique())
+    col1.metric("Usuarios", stats["n_usuarios"])
+    col2.metric("Peliculas", stats["n_peliculas"])
+    col3.metric("Valoraciones", stats["n_valoraciones"])
+    col4.metric("Densidad", f"{stats['densidad']}%")
 
-    with col3:
-        st.metric("Valoraciones", len(ratings_df))
+    st.divider()
 
-    st.subheader("Distribución general de ratings")
-    _plot_rating_distribution(ratings_df, rating_col)
+    st.subheader("Distribucion de ratings")
+    _graficar_distribucion_ratings(df)
 
-    st.subheader("Productos más recomendados")
-    recommendations_df = _recommendations_to_df()
-    _plot_top_recommended(recommendations_df)
+    st.subheader("Peliculas con mas valoraciones")
+    _graficar_peliculas_mas_valoradas(df)
+
+    st.subheader("Peliculas mejor evaluadas")
+    st.write(
+        "Se consideran solo peliculas con al menos 50 valoraciones para evitar "
+        "promedios poco representativos."
+    )
+    _mostrar_mejores_promedios(df)
 
     with st.expander("Vista previa del dataset"):
-        st.dataframe(ratings_df.head(20), use_container_width=True)
+        columnas = [
+            "userId",
+            "movieId",
+            "title",
+            "rating",
+            "age",
+            "gender",
+            "occupation",
+        ]
 
+        columnas_disponibles = [
+            columna for columna in columnas
+            if columna in df.columns
+        ]
 
-render = render_tab_analisis
+        st.dataframe(
+            df[columnas_disponibles].head(20),
+            use_container_width=True,
+            hide_index=True,
+        )

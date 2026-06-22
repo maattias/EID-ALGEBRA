@@ -1,7 +1,9 @@
+#app.py
+
 import streamlit as st
 
-from src.data_loader import build_user_item_matrix, load_dataset
-from src.model.similarity import calculate_similarity_matrix
+from src.data_loader import cargar_dataset, construir_matriz_usuario_pelicula
+from src.model.similarity import calcular_matriz_similitud
 from ui.sidebar import render_sidebar
 from ui.styles import cargar_estilos
 from ui.tabs.tab_analisis import render_tab_analisis
@@ -17,18 +19,16 @@ st.set_page_config(
 )
 
 cargar_estilos()
-
 st.title("Sistema de Recomendacion")
 st.caption("Sistema basado en matriz usuario-pelicula y similitud coseno")
 st.divider()
 
-
 @st.cache_data(show_spinner=False)
 def inicializar_datos():
     """Carga el dataset, construye la matriz usuario-pelicula y calcula similitudes."""
-    df = load_dataset()
-    matriz = build_user_item_matrix(df, item_col="movieId")
-    similitud = calculate_similarity_matrix(matriz)
+    df = cargar_dataset()
+    matriz = construir_matriz_usuario_pelicula(df, columna_item="movieId")
+    similitud = calcular_matriz_similitud(matriz)
 
     return {
         "df": df,
@@ -67,6 +67,8 @@ parametros = render_sidebar(datos=datos)
 
 st.session_state["selected_user"] = parametros["user_id"]
 st.session_state["sample_size"] = parametros["n_muestra_heatmap"]
+st.session_state["k_vecinos"] = parametros["k_vecinos"]
+st.session_state["n_recomendaciones"] = parametros["n_recomendaciones"]
 
 tab1, tab2, tab3, tab4 = st.tabs(
     [
@@ -79,12 +81,9 @@ tab1, tab2, tab3, tab4 = st.tabs(
 
 with tab1:
     render_tab_analisis()
-
 with tab2:
     render_tab_matematicas()
-
 with tab3:
     render_tab_similitud()
-
 with tab4:
     render_tab_recomendaciones()
