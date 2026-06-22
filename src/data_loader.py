@@ -1,48 +1,40 @@
-# src/data_loader.py
+#src/data_loader.py
 
 from pathlib import Path
-
 import pandas as pd
 
-DATASET_CANDIDATES = [
-    Path("data/ml-100k"),
-    Path("data/m1-100k"),
-]
+DATASET_PATH = Path("data/ml-100k")
 
 
 def get_dataset_path() -> Path:
-    """
-    Busca automáticamente la carpeta del dataset MovieLens 100K.
-    """
+    """Valida y retorna la ruta del dataset MovieLens 100K."""
+    required_files = ["u.data", "u.item", "u.user"]
 
-    for path in DATASET_CANDIDATES:
-        if (path / "u.data").exists() and (path / "u.item").exists():
-            return path
+    if not DATASET_PATH.exists():
+        raise FileNotFoundError(f"No existe la carpeta {DATASET_PATH}.")
 
-    raise FileNotFoundError(
-        "No se encontró MovieLens 100K. Debe existir la carpeta "
-        "data/ml-100k con los archivos u.data y u.item."
-    )
+    missing_files = [
+        filename for filename in required_files
+        if not (DATASET_PATH / filename).exists()
+    ]
+
+    if missing_files:
+        raise FileNotFoundError(
+            "Faltan archivos del dataset: " + ", ".join(missing_files)
+        )
+    return DATASET_PATH
 
 
 def load_and_clean_data(filepath=None, min_ratings_per_user=20):
-    """
-    Carga y limpia el archivo u.data.
-
-    """
-
+    """Carga las valoraciones desde u.data y filtra usuarios con pocas valoraciones."""
     if filepath is None:
         filepath = get_dataset_path() / "u.data"
-
-    filepath = Path(filepath)
-
-    column_names = ["userId", "movieId", "rating", "timestamp"]
 
     df = pd.read_csv(
         filepath,
         sep="\t",
-        names=column_names,
-        encoding="latin-1"
+        names=["userId", "movieId", "rating", "timestamp"],
+        encoding="latin-1",
     )
 
     df = df.dropna()
@@ -59,16 +51,10 @@ def load_and_clean_data(filepath=None, min_ratings_per_user=20):
 
     return df.reset_index(drop=True)
 
-
 def load_movies(filepath=None):
-    """
-    Carga el archivo u.item.
-    """
-
+    """Carga los identificadores y titulos de peliculas desde u.item."""
     if filepath is None:
         filepath = get_dataset_path() / "u.item"
-
-    filepath = Path(filepath)
 
     movies = pd.read_csv(
         filepath,
@@ -76,11 +62,11 @@ def load_movies(filepath=None):
         header=None,
         encoding="latin-1",
         usecols=[0, 1],
-        names=["movieId", "title"]
     )
 
-    movies = movies.dropna()
+    movies.columns = ["movieId", "title"]
 
+    movies = movies.dropna()
     movies["movieId"] = movies["movieId"].astype(int)
     movies["title"] = movies["title"].astype(str)
 
@@ -88,40 +74,30 @@ def load_movies(filepath=None):
 
 
 def load_users(filepath=None):
-    """
-    Carga el archivo u.user.
-    """
-
+    """Carga la informacion demografica de usuarios desde u.user."""
     if filepath is None:
         filepath = get_dataset_path() / "u.user"
-
-    filepath = Path(filepath)
 
     users = pd.read_csv(
         filepath,
         sep="|",
         header=None,
         encoding="latin-1",
-        names=["userId", "age", "gender", "occupation", "zipCode"]
+        names=["userId", "age", "gender", "occupation", "zipCode"],
     )
 
     users = users.dropna()
-
     users["userId"] = users["userId"].astype(int)
     users["age"] = users["age"].astype(int)
+    users["gender"] = users["gender"].astype(str)
+    users["occupation"] = users["occupation"].astype(str)
+    users["zipCode"] = users["zipCode"].astype(str)
 
     return users.reset_index(drop=True)
 
 
-def load_dataset(
-    ratings_path=None,
-    movies_path=None,
-    min_ratings_per_user=20
-):
-    """
-    Carga ratings + títulos de películas.
-    """
-
+def load_dataset(ratings_path=None, movies_path=None, users_path=None, min_ratings_per_user=20):
+    """Carga ratings, peliculas y usuarios en un unico DataFrame."""
     dataset_path = get_dataset_path()
 
     if ratings_path is None:
@@ -130,24 +106,29 @@ def load_dataset(
     if movies_path is None:
         movies_path = dataset_path / "u.item"
 
+    if users_path is None:
+        users_path = dataset_path / "u.user"
+
     ratings = load_and_clean_data(
         filepath=ratings_path,
-        min_ratings_per_user=min_ratings_per_user
+        min_ratings_per_user=min_ratings_per_user,
     )
 
     movies = load_movies(movies_path)
+    users = load_users(users_path)
 
     dataset = ratings.merge(movies, on="movieId", how="left")
-    dataset = dataset.dropna(subset=["userId", "movieId", "rating", "title"])
+    dataset = dataset.merge(users, on="userId", how="left")
+
+    dataset = dataset.dropna(
+        subset=["userId", "movieId", "rating", "title"]
+    )
 
     return dataset.reset_index(drop=True)
 
 
 def build_user_item_matrix(df, item_col="movieId"):
-    """
-    Construye la matriz usuario-producto.
-    """
-
+    """Construye la matriz usuario-pelicula a partir de las valoraciones."""
     required_columns = {"userId", item_col, "rating"}
 
     if not required_columns.issubset(df.columns):
@@ -155,22 +136,22 @@ def build_user_item_matrix(df, item_col="movieId"):
             f"El DataFrame debe contener las columnas: {required_columns}"
         )
 
-    user_item_matrix = df.pivot_table(
+    matrix = df.pivot_table(
         index="userId",
         columns=item_col,
         values="rating",
-        aggfunc="mean"
+        aggfunc="mean",
     )
 
-    return user_item_matrix
+    matrix = matrix.sort_index(axis=0)
+    matrix = matrix.sort_index(axis=1)
+
+    return matrix
 
 
 def get_dataset_summary(df):
-    """
-    Retorna métricas generales del dataset.
-    """
-
-    summary = {
+    """Retorna estadisticas generales del dataset."""
+    return {
         "users": int(df["userId"].nunique()),
         "movies": int(df["movieId"].nunique()),
         "ratings": int(len(df)),
@@ -179,37 +160,27 @@ def get_dataset_summary(df):
         "max_rating": float(df["rating"].max()),
     }
 
-    return summary
-
 
 def get_movie_title_map(movies_df=None):
-    """
-    Retorna un diccionario para traducir movieId a title.
-    """
-
+    """Retorna un diccionario para traducir movieId a title."""
     if movies_df is None:
         movies_df = load_movies()
 
     return dict(zip(movies_df["movieId"], movies_df["title"]))
 
+
 def obtener_lista_usuarios(df):
-    """
-    Retorna la lista ordenada de usuarios disponibles.
-    """
+    """Retorna la lista ordenada de usuarios disponibles."""
     return sorted(df["userId"].unique().tolist())
 
 
 def obtener_peliculas_usuario(df, user_id):
-    """
-    Retorna las películas valoradas por un usuario.
-    """
+    """Retorna las peliculas valoradas por un usuario especifico."""
     return df[df["userId"] == user_id].copy()
 
 
 def obtener_estadisticas(df):
-    """
-    Retorna estadísticas básicas del dataset para el sidebar.
-    """
+    """Retorna estadisticas resumidas para la interfaz."""
     n_usuarios = df["userId"].nunique()
     n_peliculas = df["movieId"].nunique()
     n_valoraciones = len(df)
@@ -217,7 +188,7 @@ def obtener_estadisticas(df):
     total_posibles = n_usuarios * n_peliculas
 
     if total_posibles == 0:
-        densidad = 0
+        densidad = 0.0
     else:
         densidad = round((n_valoraciones / total_posibles) * 100, 2)
 
@@ -227,17 +198,3 @@ def obtener_estadisticas(df):
         "n_valoraciones": int(n_valoraciones),
         "densidad": densidad,
     }
-
-
-if __name__ == "__main__":
-    df = load_dataset()
-    matrix = build_user_item_matrix(df)
-
-    print("Dataset:")
-    print(df.head())
-
-    print("\nResumen:")
-    print(get_dataset_summary(df))
-
-    print("\nForma de la matriz usuario-producto:")
-    print(matrix.shape)

@@ -1,34 +1,33 @@
 import streamlit as st
 
-from ui.sidebar import render_sidebar
-#from ui.tabs.tab_recomendaciones import render_tab_recomendaciones
-from ui.tabs.tab_analisis import render_tab_analisis
-from ui.tabs.tab_similitud import render_tab_similitud
-
-from src.data_loader import load_dataset, build_user_item_matrix
+from src.data_loader import build_user_item_matrix, load_dataset
 from src.model.similarity import calculate_similarity_matrix
+from ui.sidebar import render_sidebar
 from ui.styles import cargar_estilos
+from ui.tabs.tab_analisis import render_tab_analisis
+from ui.tabs.tab_matematicas import render_tab_matematicas
+from ui.tabs.tab_recomendaciones import render_tab_recomendaciones
+from ui.tabs.tab_similitud import render_tab_similitud
 
 
 st.set_page_config(
-    page_title="SistemaRec — Recomendaciones con Álgebra Lineal",
-    page_icon="🎬",
+    page_title="SistemaRec - Recomendaciones con Algebra Lineal",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 cargar_estilos()
 
-st.title("🎬 Sistema de Recomendación")
-st.caption("Basado en similitud coseno y álgebra lineal · MATE1187")
+st.title("Sistema de Recomendacion")
+st.caption("Sistema basado en matriz usuario-pelicula y similitud coseno")
 st.divider()
 
 
 @st.cache_data(show_spinner=False)
 def inicializar_datos():
+    """Carga el dataset, construye la matriz usuario-pelicula y calcula similitudes."""
     df = load_dataset()
-
-    matriz = build_user_item_matrix(df, item_col="title")
+    matriz = build_user_item_matrix(df, item_col="movieId")
     similitud = calculate_similarity_matrix(matriz)
 
     return {
@@ -37,29 +36,24 @@ def inicializar_datos():
         "similitud": similitud,
     }
 
-
-with st.spinner("Cargando dataset y calculando similitudes..."):
-    try:
+try:
+    with st.spinner("Cargando dataset y calculando similitudes..."):
         datos = inicializar_datos()
-        carga_exitosa = True
-    except FileNotFoundError:
-        datos = None
-        carga_exitosa = False
-        st.session_state["error"] = "No se encontró el dataset."
-    except Exception as e:
-        datos = None
-        carga_exitosa = False
-        st.session_state["error"] = str(e)
 
-
-if not carga_exitosa:
+except FileNotFoundError as error:
     st.error(
-        "⚠️ No se pudo cargar la app. "
-        "Revisa que el dataset esté en `data/ml-100k/` y que existan `u.data`, `u.item` y `u.user`."
+        "No se pudo cargar el dataset. Revisa que existan los archivos "
+        "`u.data`, `u.item` y `u.user` dentro de `data/ml-100k/`."
     )
+    with st.expander("Detalle del error"):
+        st.code(str(error))
+    st.stop()
 
-    with st.expander("Ver detalle del error"):
-        st.code(st.session_state.get("error", "Error desconocido"))
+except Exception as error:
+    st.error("Ocurrio un error al inicializar la aplicacion.")
+
+    with st.expander("Detalle del error"):
+        st.code(str(error))
 
     st.stop()
 
@@ -74,14 +68,23 @@ parametros = render_sidebar(datos=datos)
 st.session_state["selected_user"] = parametros["user_id"]
 st.session_state["sample_size"] = parametros["n_muestra_heatmap"]
 
-
-tab1, tab2 = st.tabs([
-    "📊 Análisis",
-    "🔗 Similitud",
-])
+tab1, tab2, tab3, tab4 = st.tabs(
+    [
+        "Analisis",
+        "Matematicas",
+        "Similitud",
+        "Recomendaciones",
+    ]
+)
 
 with tab1:
     render_tab_analisis()
 
 with tab2:
+    render_tab_matematicas()
+
+with tab3:
     render_tab_similitud()
+
+with tab4:
+    render_tab_recomendaciones()

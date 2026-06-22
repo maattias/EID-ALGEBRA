@@ -3,3 +3,9 @@
 src/__pycache__/
 
 *.pyc
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+.env
+.venv/
