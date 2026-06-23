@@ -1,5 +1,13 @@
 #ui/tabs/tab_matematicas.py
 
+"""
+Módulo de visualización didáctica
+
+Expone la caja negra del sistema de recomendación mediante la manipulación
+interactiva de un subespacio muestral (matriz de 3x3), graficando 
+las variaciones de los cosenos y productos escalares en tiempo real.
+"""
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -9,7 +17,11 @@ from src.model.similarity import obtener_pasos_similitud_coseno
 
 
 def render_tab_matematicas():
-    """Muestra la base matematica del sistema de recomendacion."""
+    """
+    Muestra la base matematica del sistema de recomendacion.
+    Genera un DataFrame en memoria que el usuario puede mutar, calculando y
+    exponiendo secuencialmente las normas L2 y el producto punto cruzado.
+    """
     st.header("Fundamentos matematicos")
 
     st.subheader("Matriz usuario-pelicula")
@@ -26,6 +38,9 @@ def render_tab_matematicas():
         },
         index=["Usuario 1", "Usuario 2", "Usuario 3"],
     )
+
+    # Inyecta un componente bidireccional (data_editor) que permite a la UI 
+    # capturar las alteraciones numéricas ingresadas por el usuario
 
     matriz_editada = st.data_editor(
         matriz_ejemplo,

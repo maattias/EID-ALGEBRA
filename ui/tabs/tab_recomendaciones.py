@@ -1,5 +1,12 @@
 # ui/tabs/tab_recomendaciones.py
 
+"""
+Módulo de visualización de recomendaciones finales.
+
+Consume la lógica predictiva de `recommender.py` y renderiza el resultado final, 
+formateando los tensores matemáticos en tablas comprensibles para el usuario.
+"""
+
 import streamlit as st
 
 from src.data_loader import obtener_peliculas_usuario
@@ -7,9 +14,17 @@ from src.recommender import obtener_k_vecinos, recomendar_con_titulos
 
 
 def render_tab_recomendaciones():
-    """Muestra recomendaciones personalizadas para el usuario seleccionado."""
-    datos = st.session_state["datos"]
+    """
+    Muestra recomendaciones personalizadas para el usuario seleccionado.
+    Ejecuta el pipeline de recomendación y mapea la salida en la interfaz.
 
+    Toma las variables de estado global, procesa la predicción ponderada y 
+    segmenta la pantalla en dos bloques: las sugerencias nuevas y el 
+    historial de contexto del usuario.
+    """
+
+    # Desempaquetado de las matrices pre-calculadas en RAM
+    datos = st.session_state["datos"]
     df = datos["df"]
     matriz = datos["matriz"]
     similitud = datos["similitud"]
@@ -25,6 +40,7 @@ def render_tab_recomendaciones():
     col1, col2 = st.columns(2)
 
     with col1:
+        # Registra una variable key para evitar conflictos de estado entre sliders de otras pestañas
         k_vecinos = st.slider(
             "Cantidad de vecinos similares para recomendar",
             min_value=1,
@@ -90,6 +106,7 @@ def render_tab_recomendaciones():
 
     st.subheader("Peliculas recomendadas")
 
+    # Invocación del motor algebraico orquestador
     recomendaciones = recomendar_con_titulos(
         user_id=user_id,
         matriz=matriz,
@@ -105,6 +122,7 @@ def render_tab_recomendaciones():
             "Prueba aumentando la cantidad de vecinos similares."
         )
     else:
+        # Transformación de llaves técnicas a etiquetas amigables para visualización
         recomendaciones = recomendaciones.rename(
             columns={
                 "movieId": "ID pelicula",
@@ -121,8 +139,10 @@ def render_tab_recomendaciones():
 
     st.divider()
 
+    # Expander colapsable: Evita saturar la vista principal pero permite auditoría manual
     with st.expander("Ver peliculas ya valoradas por el usuario"):
         historial = peliculas_usuario[["movieId", "title", "rating"]].copy()
+        # Orden descendente para exhibir primero las preferencias más fuertes
         historial = historial.sort_values("rating", ascending=False)
 
         historial = historial.rename(

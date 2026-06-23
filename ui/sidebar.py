@@ -1,5 +1,12 @@
 #ui/sidebar.py
 
+"""
+Módulo de navegación y parametrización de la interfaz gráfica.
+
+Renderiza el panel lateral (Sidebar) permitiendo al usuario mutar las variables 
+de estado global (K vecinos, usuario objetivo) que controlan el motor algebraico.
+"""
+
 import pandas as pd
 import streamlit as st
 
@@ -22,6 +29,7 @@ def render_sidebar(datos: dict) -> dict:
         st.markdown("#### Usuario objetivo")
         lista_usuarios = obtener_lista_usuarios(df)
 
+        # El selector inyecta el valor automáticamente en la sesión local
         user_id = st.selectbox(
             label="Selecciona un usuario",
             options=lista_usuarios,
@@ -44,6 +52,7 @@ def render_sidebar(datos: dict) -> dict:
 
         st.markdown("#### Visualizacion")
 
+        # Limita de forma dinámica el máximo del slider según el tamaño real de la matriz
         max_heatmap = max(1, min(100, len(matriz)))
         valor_heatmap = min(30, max_heatmap)
 
@@ -59,7 +68,7 @@ def render_sidebar(datos: dict) -> dict:
 
         _mostrar_info_dataset(df)
 
-    return {
+    return {                # dict: Variables paramétricas (user_id, k_vecinos_similitud, n_muestra_heatmap).
         "user_id": user_id,
         "k_vecinos_similitud": k_vecinos_similitud,
         "n_muestra_heatmap": n_muestra_heatmap,
@@ -69,7 +78,6 @@ def render_sidebar(datos: dict) -> dict:
 def _mostrar_perfil_usuario(df: pd.DataFrame, user_id: int) -> None:
     """Muestra un resumen compacto del usuario seleccionado."""
     peliculas_usuario = obtener_peliculas_usuario(df, user_id)
-
     n_valoradas = len(peliculas_usuario)
 
     if n_valoradas == 0:

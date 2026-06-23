@@ -1,8 +1,17 @@
 #src/data_loader.py
 
+"""
+Módulo de ingesta, limpieza y estructuración de datos.
+
+Se encarga de leer el dataset crudo de MovieLens, quitar registros 
+sin significancia estadística y transformar las relaciones planas 
+en matrices bidimensionales (espacios vectoriales) para el motor algebraico.
+"""
+
 from pathlib import Path
 import pandas as pd
 
+# Usamos pathlib para asegurar compatibilidad de rutas entre Windows y Mac/Linux
 RUTA_DATASET = Path("data/ml-100k")
 
 def obtener_ruta_dataset() -> Path:
@@ -22,7 +31,7 @@ def obtener_ruta_dataset() -> Path:
             "Faltan archivos del dataset: " + ", ".join(archivos_faltantes)
         )
 
-    return RUTA_DATASET
+    return RUTA_DATASET # Path: Objeto con la ruta validada hacia el directorio del dataset.
 
 
 def cargar_y_limpiar_valoraciones(ruta_archivo=None, minimo_valoraciones_usuario=20):
@@ -30,6 +39,8 @@ def cargar_y_limpiar_valoraciones(ruta_archivo=None, minimo_valoraciones_usuario
     if ruta_archivo is None:
         ruta_archivo = obtener_ruta_dataset() / "u.data"
 
+    # El dataset original de 1998 utiliza codificación ISO-8859-1 (latin-1). 
+    # Forzar UTF-8 arrojaría un UnicodeDecodeError fatal.
     df = pd.read_csv(
         ruta_archivo,
         sep="\t",
@@ -44,6 +55,8 @@ def cargar_y_limpiar_valoraciones(ruta_archivo=None, minimo_valoraciones_usuario
     df["rating"] = df["rating"].astype(float)
     df["timestamp"] = df["timestamp"].astype(int)
 
+    # Extrae un vector de frecuencias y filtra mediante indexación booleana (.isin)
+    # Esto es computacionalmente más rápido (vectorizado) que iterar fila por fila
     if minimo_valoraciones_usuario > 1:
         conteo_usuarios = df["userId"].value_counts()
         usuarios_validos = conteo_usuarios[
@@ -52,7 +65,7 @@ def cargar_y_limpiar_valoraciones(ruta_archivo=None, minimo_valoraciones_usuario
 
         df = df[df["userId"].isin(usuarios_validos)]
 
-    return df.reset_index(drop=True)
+    return df.reset_index(drop=True) # DataFrame: Tabla plana saneada con columnas ['userId', 'movieId', 'rating'].
 
 
 def cargar_peliculas(ruta_archivo=None):
@@ -175,7 +188,7 @@ def obtener_mapa_titulos(peliculas_df=None):
     if peliculas_df is None:
         peliculas_df = cargar_peliculas()
 
-    return dict(zip(peliculas_df["movieId"], peliculas_df["title"]))
+    return dict(zip(peliculas_df["movieId"], peliculas_df["title"])) # Mapeo llave-valor {movieId: title}.
 
 
 def obtener_lista_usuarios(df):
@@ -199,6 +212,7 @@ def obtener_estadisticas(df):
     if total_posibles == 0:
         densidad = 0.0
     else:
+        # Calcula la densidad: qué porcentaje de la matriz contiene datos reales vs vacíos
         densidad = round((n_valoraciones / total_posibles) * 100, 2)
 
     return {
