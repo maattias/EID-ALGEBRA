@@ -251,7 +251,12 @@ def _mostrar_matriz_usuario_pelicula_real(df):
     col2.metric("Películas mostradas", muestra.shape[1])
     col3.metric("Densidad de la muestra", f"{densidad_muestra}%")
 
-    muestra_visual = muestra.fillna("—")
+    muestra_visual = muestra.copy()
+    muestra_visual = muestra_visual.apply(
+        lambda columna: columna.map(
+            lambda valor: "—" if pd.isna(valor) else str(int(valor))
+        )
+    )
 
     st.dataframe(
         muestra_visual,
