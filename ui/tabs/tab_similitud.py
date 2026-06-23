@@ -1,8 +1,9 @@
-#ui/tabs/tab_similitud.py
+# ui/tabs/tab_similitud.py
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import streamlit as st
+
 from src.model.similarity import calcular_matriz_similitud
 from src.recommender import obtener_k_vecinos
 
@@ -10,8 +11,10 @@ from src.recommender import obtener_k_vecinos
 def _obtener_datos():
     """Obtiene los datos cargados desde session_state."""
     datos = st.session_state.get("datos")
+
     if not isinstance(datos, dict):
         return None
+
     return datos
 
 
@@ -20,9 +23,11 @@ def _obtener_matriz_similitud(datos):
     matriz = datos["matriz"]
     similitud = datos.get("similitud")
 
+    # app.py normalmente ya calcula esta matriz al iniciar la app.
     if isinstance(similitud, pd.DataFrame) and not similitud.empty:
         return similitud
 
+    # Si no existe, se calcula usando la funcion matematica de src/model/similarity.py.
     return calcular_matriz_similitud(matriz)
 
 
@@ -35,26 +40,32 @@ def _obtener_usuario_seleccionado(similitud):
 
     try:
         user_id = int(user_id)
+
         if user_id in similitud.index:
             return user_id
     except (TypeError, ValueError):
         pass
 
+    # Si el usuario seleccionado no existe, se usa el primer usuario disponible.
     return similitud.index[0]
 
 
 def _graficar_heatmap(similitud, muestra):
     """Grafica un mapa de calor de similitud entre usuarios."""
+    # Se toma una submatriz para no graficar los 943 usuarios completos.
     muestra = min(int(muestra), len(similitud))
     muestra_df = similitud.iloc[:muestra, :muestra]
 
     fig, ax = plt.subplots(figsize=(8, 6))
+
+    # El heatmap representa la matriz de similitud coseno.
+    # Cada celda indica que tan parecidos son dos usuarios.
     imagen = ax.imshow(
         muestra_df.values,
         aspect="auto",
         vmin=0,
         vmax=1,
-)
+    )
 
     ax.set_title("Mapa de calor de similitud coseno")
     ax.set_xlabel("Usuarios")
@@ -67,12 +78,15 @@ def _graficar_heatmap(similitud, muestra):
     ax.set_yticklabels(muestra_df.index, fontsize=8)
 
     fig.colorbar(imagen, ax=ax, label="Similitud coseno")
+
     st.pyplot(fig)
     plt.close(fig)
 
 
 def _mostrar_usuarios_similares(similitud, user_id, k_vecinos):
     """Muestra los usuarios mas similares al usuario objetivo."""
+    # obtener_k_vecinos() esta definida en src/recommender.py.
+    # Usa la matriz de similitud para buscar los usuarios con mayor coseno.
     vecinos = obtener_k_vecinos(
         user_id=user_id,
         similitud=similitud,
@@ -96,6 +110,7 @@ def _mostrar_usuarios_similares(similitud, user_id, k_vecinos):
 
 def _graficar_comparacion_perfiles(matriz, similitud, user_id, df):
     """Compara ratings comunes entre el usuario objetivo y su vecino mas cercano."""
+    # Se obtiene solo el vecino mas cercano para comparar perfiles de forma visual.
     vecinos = obtener_k_vecinos(
         user_id=user_id,
         similitud=similitud,
@@ -109,9 +124,11 @@ def _graficar_comparacion_perfiles(matriz, similitud, user_id, df):
     vecino_id = vecinos.index[0]
     valor_similitud = vecinos.iloc[0]
 
+    # Cada fila de la matriz usuario-pelicula representa un vector de preferencias.
     ratings_usuario = matriz.loc[user_id]
     ratings_vecino = matriz.loc[vecino_id]
 
+    # Se comparan solo peliculas que ambos usuarios valoraron.
     peliculas_comunes = ratings_usuario.notna() & ratings_vecino.notna()
 
     comparacion = pd.DataFrame(
@@ -127,12 +144,13 @@ def _graficar_comparacion_perfiles(matriz, similitud, user_id, df):
         )
         return
 
+    # Diferencia absoluta entre ratings.
+    # Sirve para ver que tan parecidas fueron sus valoraciones en peliculas comunes.
     comparacion["diferencia"] = (
         comparacion[f"Usuario {user_id}"] - comparacion[f"Vecino {vecino_id}"]
     ).abs()
 
     total_comunes = len(comparacion)
-    coincidencias_exactas = int((comparacion["diferencia"] == 0).sum())
     diferencia_promedio = round(comparacion["diferencia"].mean(), 2)
 
     col1, col2, col3 = st.columns(3)
@@ -145,9 +163,11 @@ def _graficar_comparacion_perfiles(matriz, similitud, user_id, df):
         "No representa todas las peliculas valoradas por ambos usuarios."
     )
 
+    # Se toman las 10 peliculas donde ambos usuarios tuvieron ratings mas parecidos.
     comparacion_grafico = comparacion.sort_values("diferencia").head(10)
     comparacion_grafico = comparacion_grafico.drop(columns=["diferencia"])
 
+    # Traduce movieId a titulo de pelicula.
     mapa_titulos = (
         df[["movieId", "title"]]
         .drop_duplicates()
@@ -175,6 +195,7 @@ def _graficar_comparacion_perfiles(matriz, similitud, user_id, df):
     st.pyplot(fig)
     plt.close(fig)
 
+    # Tabla completa con todas las peliculas comunes usadas en la comparacion.
     with st.expander("Ver todas las peliculas comunes comparadas"):
         tabla = comparacion.copy()
 
@@ -201,9 +222,14 @@ def render_tab_similitud():
 
     df = datos["df"]
     matriz = datos["matriz"]
+
+    # Matriz cuadrada donde filas y columnas son usuarios.
+    # Cada celda contiene la similitud coseno entre dos usuarios.
     similitud = _obtener_matriz_similitud(datos)
 
     user_id = _obtener_usuario_seleccionado(similitud)
+
+    # Parametros definidos desde el sidebar.
     muestra = st.session_state.get("sample_size", 20)
     k_vecinos = st.session_state.get("k_vecinos_similitud", 5)
 

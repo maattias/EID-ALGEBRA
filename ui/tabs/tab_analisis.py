@@ -1,24 +1,23 @@
-#ui/tabs/tab_analisis.py
+# ui/tabs/tab_analisis.py
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import streamlit as st
+
 from src.data_loader import obtener_estadisticas
 from src.recommender import recomendar_con_titulos
 
 
 def _obtener_dataset():
-    """Obtiene el dataset cargado desde session_state."""
+    # Primero se intenta obtener el DataFrame principal ya cargado por app.py.
     df = st.session_state.get("ratings_df")
-
     if isinstance(df, pd.DataFrame) and not df.empty:
         return df
 
+    # Si no existe directamente, se intenta obtener desde el diccionario general.
     datos = st.session_state.get("datos")
-
     if isinstance(datos, dict):
         df = datos.get("df")
-
         if isinstance(df, pd.DataFrame) and not df.empty:
             return df
 
@@ -27,6 +26,8 @@ def _obtener_dataset():
 
 def _graficar_distribucion_ratings(df):
     """Grafica la distribucion general de calificaciones."""
+    # Cuenta cuantas veces aparece cada rating de 1 a 5.
+    # Esto permite analizar el comportamiento general de valoraciones del dataset.
     conteo = df["rating"].value_counts().sort_index()
 
     fig, ax = plt.subplots(figsize=(8, 4))
@@ -43,6 +44,8 @@ def _graficar_distribucion_ratings(df):
 
 def _graficar_peliculas_mas_valoradas(df):
     """Grafica las peliculas con mayor cantidad de valoraciones."""
+    # Agrupa por titulo y cuenta cuantas valoraciones tiene cada pelicula.
+    # No mide si son mejores peliculas, sino cuales fueron mas evaluadas.
     top = (
         df.groupby("title")
         .size()
@@ -65,6 +68,7 @@ def _graficar_peliculas_mas_valoradas(df):
 
 def _mostrar_mejores_promedios(df):
     """Muestra peliculas con mejor promedio considerando un minimo de valoraciones."""
+    # Calcula promedio de rating y cantidad de valoraciones por pelicula.
     resumen = (
         df.groupby("title")
         .agg(
@@ -74,6 +78,7 @@ def _mostrar_mejores_promedios(df):
         .reset_index()
     )
 
+    # Se filtran peliculas con pocas valoraciones para evitar promedios poco confiables.
     resumen = resumen[resumen["cantidad_valoraciones"] >= 50]
     resumen = resumen.sort_values("promedio_rating", ascending=False).head(10)
 
@@ -102,6 +107,7 @@ def render_tab_analisis():
         st.error("No hay dataset cargado.")
         return
 
+    # Estadisticas generales calculadas en data_loader.py.
     stats = obtener_estadisticas(df)
 
     st.header("Analisis del dataset")
@@ -147,6 +153,7 @@ def render_tab_analisis():
     st.subheader("Frecuencia de peliculas recomendadas")
     _graficar_frecuencia_recomendaciones(df)
 
+    # Tabla larga del dataset procesado: cada fila es una valoracion real.
     with st.expander("Vista previa del dataset"):
         columnas = [
             "userId",
@@ -169,6 +176,7 @@ def render_tab_analisis():
             hide_index=True,
         )
 
+
 def _mostrar_matriz_usuario_pelicula_real(df):
     """Muestra una muestra densa de la matriz usuario-pelicula real."""
     datos = st.session_state.get("datos")
@@ -177,6 +185,8 @@ def _mostrar_matriz_usuario_pelicula_real(df):
         st.warning("No se encontró la matriz usuario-pelicula cargada.")
         return
 
+    # Esta matriz se construye en data_loader.py con pivot_table.
+    # Filas: usuarios. Columnas: peliculas. Celdas: ratings.
     matriz = datos.get("matriz")
 
     if not isinstance(matriz, pd.DataFrame) or matriz.empty:
@@ -188,7 +198,6 @@ def _mostrar_matriz_usuario_pelicula_real(df):
         "Cada fila representa un usuario, cada columna representa una película "
         "y cada celda contiene el rating asignado por ese usuario."
     )
-
 
     col1, col2 = st.columns(2)
 
@@ -212,6 +221,7 @@ def _mostrar_matriz_usuario_pelicula_real(df):
             key="columnas_matriz_real_analisis",
         )
 
+    # Selecciona usuarios con mas ratings para que la matriz mostrada no quede tan vacia.
     usuarios_mas_activos = (
         matriz.notna()
         .sum(axis=1)
@@ -220,6 +230,7 @@ def _mostrar_matriz_usuario_pelicula_real(df):
         .index
     )
 
+    # Selecciona peliculas con mas ratings para obtener una muestra mas densa.
     peliculas_mas_valoradas = (
         matriz.notna()
         .sum(axis=0)
@@ -230,6 +241,7 @@ def _mostrar_matriz_usuario_pelicula_real(df):
 
     muestra = matriz.loc[usuarios_mas_activos, peliculas_mas_valoradas].copy()
 
+    # Traduce movieId a titulo para que la matriz sea legible.
     mapa_titulos = (
         df[["movieId", "title"]]
         .drop_duplicates()
@@ -242,6 +254,7 @@ def _mostrar_matriz_usuario_pelicula_real(df):
         for movie_id in muestra.columns
     ]
 
+    # Densidad: porcentaje de celdas con rating dentro de la muestra seleccionada.
     total_celdas = muestra.shape[0] * muestra.shape[1]
     celdas_con_rating = int(muestra.notna().sum().sum())
     densidad_muestra = round((celdas_con_rating / total_celdas) * 100, 2)
@@ -251,6 +264,8 @@ def _mostrar_matriz_usuario_pelicula_real(df):
     col2.metric("Películas mostradas", muestra.shape[1])
     col3.metric("Densidad de la muestra", f"{densidad_muestra}%")
 
+    # Solo para visualizacion: cambia NaN por "—".
+    # La matriz original sigue siendo numerica para los calculos matematicos.
     muestra_visual = muestra.copy()
     muestra_visual = muestra_visual.apply(
         lambda columna: columna.map(
@@ -264,12 +279,14 @@ def _mostrar_matriz_usuario_pelicula_real(df):
     )
 
     st.caption(
-        "Para que la visualización sea más clara, la app muestra usuarios con muchas valoraciones y películas con muchas valoraciones." \
-        " Así se puede observar mejor cómo funciona la matriz usuario-película real."
+        "Para que la visualización sea más clara, la app muestra usuarios con muchas "
+        "valoraciones y películas con muchas valoraciones. Así se puede observar mejor "
+        "cómo funciona la matriz usuario-película real."
     )
 
+
 def _graficar_frecuencia_recomendaciones(df):
-    """Genera recomendaciones para una muestra de usuarios y grafica las más frecuentes."""
+    """Genera recomendaciones para una muestra de usuarios y grafica las mas frecuentes."""
     datos = st.session_state.get("datos")
 
     if not isinstance(datos, dict):
@@ -296,6 +313,8 @@ def _graficar_frecuencia_recomendaciones(df):
     usuarios = list(matriz.index[:n_usuarios])
     recomendaciones_generales = []
 
+    # Para cada usuario de la muestra, se usa el recomendador real del sistema.
+    # La funcion recomendar_con_titulos() esta definida en src/recommender.py.
     for user_id in usuarios:
         recomendaciones = recomendar_con_titulos(
             user_id=user_id,
@@ -315,6 +334,7 @@ def _graficar_frecuencia_recomendaciones(df):
 
     recomendaciones_df = pd.concat(recomendaciones_generales, ignore_index=True)
 
+    # Cuenta cuantas veces aparece cada pelicula como recomendacion.
     frecuencia = (
         recomendaciones_df["title"]
         .value_counts()
