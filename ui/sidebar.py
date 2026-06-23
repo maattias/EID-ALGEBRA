@@ -29,18 +29,11 @@ def render_sidebar(datos: dict) -> dict:
         )
         _mostrar_perfil_usuario(df, user_id)
         st.divider()
-        st.markdown("#### Parametros de recomendacion")
+        
+        st.markdown("#### Parametros de similitud")
 
-        n_recomendaciones = st.slider(
-            label="Numero de recomendaciones",
-            min_value=1,
-            max_value=20,
-            value=10,
-            step=1,
-        )
-
-        k_vecinos = st.slider(
-            label="Numero de vecinos similares",
+        k_vecinos_similitud = st.slider(
+            label="Usuarios similares a mostrar",
             min_value=1,
             max_value=50,
             value=5,
@@ -68,8 +61,7 @@ def render_sidebar(datos: dict) -> dict:
 
     return {
         "user_id": user_id,
-        "n_recomendaciones": n_recomendaciones,
-        "k_vecinos": k_vecinos,
+        "k_vecinos_similitud": k_vecinos_similitud,
         "n_muestra_heatmap": n_muestra_heatmap,
     }
 

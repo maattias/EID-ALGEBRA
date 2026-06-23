@@ -200,7 +200,7 @@ def render_tab_similitud():
 
     user_id = _obtener_usuario_seleccionado(similitud)
     muestra = st.session_state.get("sample_size", 20)
-    k_vecinos = st.session_state.get("k_vecinos", 5)
+    k_vecinos = st.session_state.get("k_vecinos_similitud", 5)
 
     st.header("Similitud entre usuarios")
 

@@ -67,8 +67,7 @@ parametros = render_sidebar(datos=datos)
 
 st.session_state["selected_user"] = parametros["user_id"]
 st.session_state["sample_size"] = parametros["n_muestra_heatmap"]
-st.session_state["k_vecinos"] = parametros["k_vecinos"]
-st.session_state["n_recomendaciones"] = parametros["n_recomendaciones"]
+st.session_state["k_vecinos_similitud"] = parametros["k_vecinos_similitud"]
 
 tab1, tab2, tab3, tab4 = st.tabs(
     [

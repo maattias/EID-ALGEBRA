@@ -1,6 +1,7 @@
-#ui/tabs/tab_recomendaciones.py
+# ui/tabs/tab_recomendaciones.py
 
 import streamlit as st
+
 from src.data_loader import obtener_peliculas_usuario
 from src.recommender import obtener_k_vecinos, recomendar_con_titulos
 
@@ -15,7 +16,7 @@ def render_tab_recomendaciones():
 
     user_id = st.session_state["selected_user"]
 
-    st.header("Recomendaciones personalizadas")
+    st.header(f"Recomendaciones para el usuario {user_id}")
     st.write(
         "El sistema busca usuarios similares mediante similitud coseno y recomienda "
         "peliculas que el usuario objetivo aun no ha valorado."
@@ -25,11 +26,12 @@ def render_tab_recomendaciones():
 
     with col1:
         k_vecinos = st.slider(
-            "Cantidad de vecinos similares",
+            "Cantidad de vecinos similares para recomendar",
             min_value=1,
             max_value=30,
             value=5,
             step=1,
+            key="k_vecinos_recomendacion",
         )
 
     with col2:
@@ -39,12 +41,17 @@ def render_tab_recomendaciones():
             max_value=20,
             value=10,
             step=1,
+            key="n_recomendaciones_tab",
         )
 
     peliculas_usuario = obtener_peliculas_usuario(df, user_id)
 
     total_vistas = len(peliculas_usuario)
-    promedio_usuario = peliculas_usuario["rating"].mean()
+
+    if total_vistas == 0:
+        promedio_usuario = 0.0
+    else:
+        promedio_usuario = peliculas_usuario["rating"].mean()
 
     col1, col2, col3 = st.columns(3)
     col1.metric("Usuario objetivo", user_id)
@@ -60,6 +67,10 @@ def render_tab_recomendaciones():
     )
 
     st.subheader("Usuarios mas similares")
+    st.caption(
+        "Estos usuarios se usan como referencia para calcular los puntajes predichos "
+        "de peliculas que el usuario objetivo aun no ha valorado."
+    )
 
     if vecinos.empty:
         st.warning("No se encontraron usuarios similares para generar recomendaciones.")
