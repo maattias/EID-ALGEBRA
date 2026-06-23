@@ -49,7 +49,12 @@ def _graficar_heatmap(similitud, muestra):
     muestra_df = similitud.iloc[:muestra, :muestra]
 
     fig, ax = plt.subplots(figsize=(8, 6))
-    imagen = ax.imshow(muestra_df.values, aspect="auto")
+    imagen = ax.imshow(
+        muestra_df.values,
+        aspect="auto",
+        vmin=0,
+        vmax=1,
+)
 
     ax.set_title("Mapa de calor de similitud coseno")
     ax.set_xlabel("Usuarios")
